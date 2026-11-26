@@ -1,0 +1,325 @@
+{
+    "name": "pl_github_incremental_to_bronze",
+    "properties": {
+        "activities": [
+            {
+                "name": "lk_read_manifest",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "JsonSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "JsonReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "ds_config_manifest",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "fe_process_files",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "sv_initialize_processed_files",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('fl_unprocessed_files').output.Value",
+                        "type": "Expression"
+                    },
+                    "isSequential": true,
+                    "activities": [
+                        {
+                            "name": "cp_github_to_bronze",
+                            "type": "Copy",
+                            "dependsOn": [],
+                            "policy": {
+                                "timeout": "0.12:00:00",
+                                "retry": 0,
+                                "retryIntervalInSeconds": 30,
+                                "secureOutput": false,
+                                "secureInput": false
+                            },
+                            "userProperties": [],
+                            "typeProperties": {
+                                "source": {
+                                    "type": "DelimitedTextSource",
+                                    "additionalColumns": [
+                                        {
+                                            "name": "business_date",
+                                            "value": {
+                                                "value": "@pipeline().parameters.p_business_date",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "load_date",
+                                            "value": {
+                                                "value": "@pipeline().parameters.p_business_date",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "ingested_at",
+                                            "value": {
+                                                "value": "@utcNow()",
+                                                "type": "Expression"
+                                            }
+                                        },
+                                        {
+                                            "name": "source_file",
+                                            "value": {
+                                                "value": "@last(split(item().p_rel_url,'/'))",
+                                                "type": "Expression"
+                                            }
+                                        }
+                                    ],
+                                    "storeSettings": {
+                                        "type": "HttpReadSettings",
+                                        "requestMethod": "GET"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextReadSettings"
+                                    }
+                                },
+                                "sink": {
+                                    "type": "DelimitedTextSink",
+                                    "storeSettings": {
+                                        "type": "AzureBlobFSWriteSettings",
+                                        "copyBehavior": "PreserveHierarchy"
+                                    },
+                                    "formatSettings": {
+                                        "type": "DelimitedTextWriteSettings",
+                                        "quoteAllText": true,
+                                        "fileExtension": ".txt"
+                                    }
+                                },
+                                "enableStaging": false,
+                                "translator": {
+                                    "type": "TabularTranslator",
+                                    "typeConversion": true,
+                                    "typeConversionSettings": {
+                                        "allowDataTruncation": true,
+                                        "treatBooleanAsNumber": false
+                                    }
+                                }
+                            },
+                            "inputs": [
+                                {
+                                    "referenceName": "ds_github_dynamic_csv",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "p_rel_url": {
+                                            "value": "@item().p_rel_url",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ],
+                            "outputs": [
+                                {
+                                    "referenceName": "ds_bronze_dynamic_csv",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "p_sink_folder": {
+                                            "value": "@item().p_sink_folder",
+                                            "type": "Expression"
+                                        },
+                                        "p_sink_file": {
+                                            "value": "@item().p_sink_file",
+                                            "type": "Expression"
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "av_add_successful_file",
+                            "type": "AppendVariable",
+                            "dependsOn": [
+                                {
+                                    "activity": "cp_github_to_bronze",
+                                    "dependencyConditions": [
+                                        "Succeeded"
+                                    ]
+                                }
+                            ],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "variableName": "v_processed_files",
+                                "value": {
+                                    "value": "@item().p_sink_file",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "lk_read_processed_files",
+                "type": "Lookup",
+                "dependsOn": [
+                    {
+                        "activity": "lk_read_manifest",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "JsonSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": true,
+                            "enablePartitionDiscovery": false
+                        },
+                        "formatSettings": {
+                            "type": "JsonReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "ds_processed_files",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "fl_unprocessed_files",
+                "type": "Filter",
+                "dependsOn": [
+                    {
+                        "activity": "lk_read_processed_files",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('lk_read_manifest').output.value",
+                        "type": "Expression"
+                    },
+                    "condition": {
+                        "value": "@not(contains(activity('lk_read_processed_files').output.value[0].processed_files, item().p_sink_file))",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "sv_initialize_processed_files",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "fl_unprocessed_files",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "v_processed_files",
+                    "value": {
+                        "value": "@activity('lk_read_processed_files').output.value[0].processed_files",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "web_update_processed_files",
+                "type": "WebActivity",
+                "dependsOn": [
+                    {
+                        "activity": "fe_process_files",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.12:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "method": "PUT",
+                    "headers": {
+                        "x-ms-blob-type": "BlockBlob",
+                        "x-ms-version": "2023-11-03",
+                        "x-ms-date": {
+                            "value": "@formatDateTime(utcNow(),'r')",
+                            "type": "Expression"
+                        },
+                        "Content-Type": "application/json"
+                    },
+                    "url": "https://brazillianstorage.blob.core.windows.net/config/processed_files.json",
+                    "body": {
+                        "value": "@concat('{\"processed_files\":', string(variables('v_processed_files')), '}')",
+                        "type": "Expression"
+                    },
+                    "authentication": {
+                        "type": "MSI",
+                        "resource": "https://storage.azure.com/"
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "p_business_date": {
+                "type": "string",
+                "defaultValue": "2018-10-17"
+            }
+        },
+        "variables": {
+            "v_processed_files": {
+                "type": "Array",
+                "defaultValue": []
+            }
+        },
+        "annotations": [],
+        "lastPublishTime": "2026-11-24T06:33:03Z"
+    },
+    "type": "Microsoft.DataFactory/factories/pipelines"
+}

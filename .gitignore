@@ -221,3 +221,35 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Azure and cloud credentials
+.azure/
+.azure_profile
+*.publishsettings
+*.pfx
+*.pem
+*.key
+
+# Databricks local configuration and credentials
+.databrickscfg
+.databricks/
+
+# Local secrets and configuration
+secrets/
+secrets.json
+credentials.json
+local.settings.json
+
+# Power BI temporary and backup files
+*.pbix.autorecovery
+*.pbix.backup
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# Original Power BI working file
+PowerBI/Sales_Visualisations.pbix

@@ -1,0 +1,27 @@
+{
+    "name": "ds_processed_files",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "storagedatalake",
+            "type": "LinkedServiceReference"
+        },
+        "annotations": [],
+        "type": "Json",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "fileName": "processed_files.json",
+                "fileSystem": "config"
+            }
+        },
+        "schema": {
+            "type": "object",
+            "properties": {
+                "processed_files": {
+                    "type": "array"
+                }
+            }
+        }
+    },
+    "type": "Microsoft.DataFactory/factories/datasets"
+}
